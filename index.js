@@ -36,6 +36,9 @@ client.on('ready', async () => {
 
 client.on('qr', async qr => {
     qrcode.generate(qr, { small: true });
+    const qrUrl = await qrcode.toDataURL(qr);
+    console.log(`Escanea este QR abriendo esta URL: ${qrUrl}`);
+
 });
 
 client.on('message_create', async (message) => {
