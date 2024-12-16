@@ -1,10 +1,12 @@
 const { Client, NoAuth, AuthStrategy } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 const { OpenAI } = require("openai");
 const express = require("express")
 const cors = require("cors")
 const dotenv = require("dotenv")
 const { getOpenAIResponse } = require("./openai");
+const fs = require('fs'); // Para verificar si el archivo existe
+const qrFilePath = './qr.png'; // Ruta del archivo QR
 
 const client = new Client({
     authStrategy: new NoAuth()
@@ -16,6 +18,7 @@ const openai = new OpenAI({ apiKey });
 
 const app = express()
 app.use(cors())
+let qrGenerated = false; // Bandera para indicar si el QR fue generado
 
 let qrImageUrl = ""
 
@@ -34,12 +37,18 @@ client.on('ready', async () => {
     }
 });
 
-client.on('qr', async qr => {
-    qrcode.generate(qr, { small: true });
-    const qrUrl = await qrcode.toDataURL(qr);
-    console.log(`Escanea este QR abriendo esta URL: ${qrUrl}`);
-
+// Generar QR y guardar como imagen
+client.on('qr', (qr) => {
+    qrcode.toFile(qrFilePath, qr, (err) => {
+        if (err) {
+            console.error('Error al guardar QR como archivo:', err);
+        } else {
+            qrGenerated = true;
+            console.log('QR guardado como qr.png');
+        }
+    });
 });
+
 
 client.on('message_create', async (message) => {
     if (message.body.length >= 2 && message.body.toLowerCase().includes("bot")) {
@@ -62,6 +71,19 @@ client.on('message_create', async (message) => {
         } catch (error) {
             await client.sendMessage(message.from, "Lo siento, hubo un problema al procesar tu mensaje.");
         }
+    }
+});
+
+app.get('/qr', (req, res) => {
+    if (qrGenerated && fs.existsSync(qrFilePath)) {
+        res.sendFile(qrFilePath, { root: __dirname }, (err) => {
+            if (err) {
+                console.error('Error al enviar el archivo QR:', err);
+                res.status(500).send('Error al acceder al QR');
+            }
+        });
+    } else {
+        res.status(404).send('El QR aún no está disponible. Intenta nuevamente más tarde.');
     }
 });
 
